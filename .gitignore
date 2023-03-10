@@ -1,0 +1,11 @@
+.vscode/
+*.ioc
+*.mxproject
+
+MDK-ARM/DebugConfig/
+MDK-ARM/BLDCM_FOC/
+*.o
+*.d
+*.crf
+*.hex
+*.map
