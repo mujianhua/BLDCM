@@ -101,7 +101,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
     printf("Hello World\n");  
-
   /* USER CODE END 2 */
 
   /* Infinite loop */

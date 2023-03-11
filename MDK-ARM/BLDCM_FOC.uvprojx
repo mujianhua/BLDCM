@@ -333,7 +333,7 @@
             <v6WtE>0</v6WtE>
             <v6Rtti>0</v6Rtti>
             <VariousControls>
-              <MiscControls>--cpp11</MiscControls>
+              <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F407xx</Define>
               <Undefine></Undefine>
               <IncludePath>../Core/Inc;                     ../Drivers/STM32F4xx_HAL_Driver/Inc;                     ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy;                     ../Drivers/CMSIS/Device/ST/STM32F4xx/Include;                     ../Drivers/CMSIS/Include</IncludePath>
@@ -391,11 +391,6 @@
           <GroupName>Application/User/Core</GroupName>
           <Files>
             <File>
-              <FileName>bldcm_control.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\bldcm_control.c</FilePath>
-            </File>
-            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>
@@ -436,14 +431,19 @@
               <FilePath>../Core/Src/stm32f4xx_hal_msp.c</FilePath>
             </File>
             <File>
-              <FileName>foc.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>..\Core\Src\foc.cpp</FilePath>
+              <FileName>bldcm_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\bldcm_control.c</FilePath>
             </File>
             <File>
-              <FileName>foc_utils.cpp</FileName>
-              <FileType>8</FileType>
-              <FilePath>..\Core\Src\foc_utils.cpp</FilePath>
+              <FileName>foc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\foc.c</FilePath>
+            </File>
+            <File>
+              <FileName>foc_utils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\foc_utils.c</FilePath>
             </File>
           </Files>
         </Group>

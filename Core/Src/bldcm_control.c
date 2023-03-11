@@ -6,11 +6,12 @@
 #include "bldcm_control.h"
 
 #include "adc.h"
+#include "foc.h"
+#include "foc_utils.h"
 #include "gpio.h"
 #include "main.h"
 #include "stm32f4xx.h"  // Device header
 #include "tim.h"
-#include "foc_utils.h"
 
 #include <stdio.h>
 
@@ -27,12 +28,10 @@ void loop(void)
         printf("enable the motor\n");
         BLDCM_Enable();
     }
-
     if (Key_Scan(KEY2_GPIO_Port, KEY2_Pin) == KEY_ON) {
         printf("disable the motor\n");
         BLDCM_Disable();
     }
-
 #if 1
     if (HAL_GetTick() % 1000 == 0 && flag == 0) {
         flag = 1;

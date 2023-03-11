@@ -1,5 +1,4 @@
 #include "foc_utils.h"
-#include <cmath>
 
 // int array instead of float array
 // 4x200 points per 360 deg
@@ -61,7 +60,7 @@ float _cos(float a)
 // normalizing radian angle to [0,2PI]
 float _normalizeAngle(float angle)
 {
-    float a = std::fmod(angle, float(_2PI));
+    float a = fmod(angle, _2PI);
     return a >= 0 ? a : (a + _2PI);
 }
 
@@ -71,18 +70,18 @@ float _electricalAngle(float shaft_angle, int pole_pairs) { return (shaft_angle 
 // square root approximation function using
 // https://reprap.org/forum/read.php?147,219210
 // https://en.wikipedia.org/wiki/Fast_inverse_square_root
-float _sqrtApprox(float number)
-{  // low in fat
-    long i;
-    float y;
-    // float x;
-    // const float f = 1.5F; // better precision
+ float _sqrtApprox(float number)
+ {  // low in fat
+     long i;
+     float y;
+     // float x;
+     // const float f = 1.5F; // better precision
 
-    // x = number * 0.5F;
-    y = number;
-    i = *(long *)&y;
-    i = 0x5f375a86 - (i >> 1);
-    y = *(float *)&i;
-    // y = y * ( f - ( x * y * y ) ); // better precision
-    return number * y;
-}
+     // x = number * 0.5F;
+     y = number;
+     i = *(long *)&y;
+     i = 0x5f375a86 - (i >> 1);
+     y = *(float *)&i;
+     // y = y * ( f - ( x * y * y ) ); // better precision
+     return number * y;
+ }

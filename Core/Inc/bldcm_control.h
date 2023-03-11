@@ -52,7 +52,7 @@ typedef struct
 } adc_value;
 
 
-
+void Init(void);
 
 void loop(void);
 

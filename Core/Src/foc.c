@@ -3,8 +3,22 @@
 #include "bldcm_control.h"
 #include "foc_utils.h"
 
-void loopFOC() {
-    DQCurrent_s current = GetFOCCurrents(0);
+#include <stdio.h>
+
+DQCurrent_s current;
+DQVoltage_s voltage;
+float shaft_angle;
+
+void initFOC() {}
+
+void loopFOC()
+{
+    shaft_angle = 0;
+    current = GetFOCCurrents(shaft_angle);
+    voltage.d = 0;
+    voltage.q = 0;
+
+    // calculate control phase voltage.
 }
 
 DQCurrent_s GetFOCCurrents(float angle_el)
@@ -25,7 +39,7 @@ DQCurrent_s GetFOCCurrents(float angle_el)
         i_alpha = u;
         i_beta = _1_SQRT3 * u + _2_SQRT3 * v;
     }
-	// calculate park transform
+    // calculate park transform
     float ct = _cos(angle_el);
     float st = _sin(angle_el);
     DQCurrent_s return_current;
