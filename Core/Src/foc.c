@@ -2,6 +2,7 @@
 
 #include "bldcm_control.h"
 #include "foc_utils.h"
+#include "pid.h"
 
 #include <stdio.h>
 
@@ -9,14 +10,21 @@ DQCurrent_s current;
 DQVoltage_s voltage;
 float shaft_angle;
 
-void initFOC() {}
+PIDController * PID_current_q;
+PIDController * PID_current_d;
+
+void initFOC()
+{
+    PID_current_d = new_PIDController(0, 0, 0, 0, 0);
+    PID_current_q = new_PIDController(0, 0, 0, 0, 0);
+}
 
 void loopFOC()
 {
     shaft_angle = 0;
     current = GetFOCCurrents(shaft_angle);
-    voltage.d = 0;
-    voltage.q = 0;
+    voltage.d = CalculatePID(PID_current_d, 0);
+    voltage.q = CalculatePID(PID_current_q, 0);
 
     // calculate control phase voltage.
 }
