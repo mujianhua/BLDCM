@@ -21,7 +21,10 @@
 #define _2PI                       6.28318530718
 #define _3PI_2                     4.71238898038
 #define _PI_6                      0.52359877559
-#define _PI_30                     0.104719755
+#define _PI_30                     0.10471975512
+#define _5PI_6                     2.61799387799
+#define _7PI_6                     3.66519142919
+#define _11PI_6                    5.75958653158
 
 #define NOT_SET                    -12345.0
 #define _HIGH_IMPEDANCE            0

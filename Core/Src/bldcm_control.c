@@ -15,17 +15,23 @@
 
 #include <stdio.h>
 
-uint32_t adc_buffer[5] = {0};
+// seq 1 > 5 > 4 > 6 > 2 > 3 > 1     000 001 010 011 100 101 110 111
+const int8_t ELECTRIC_SECTORS[8] = {-1, 0, 4, 5, 2, 1, 3, -1};
+volatile int8_t electric_sector;
+
+int16_t adc_buffer[5] = {0};
 static motor_rotate_t motor_drive = {0};
+Direction direction;
 
 adc_value adc_value_;
 uint16_t bldcm_pulse = 0;
+uint8_t shaft_electrical_count = 0;
 
 void init(void) { initFOC(); }
 
+uint8_t flag = 0;
 void loop(void)
 {
-    uint8_t flag = 0;
     if (Key_Scan(KEY1_GPIO_Port, KEY1_Pin) == KEY_ON) {
         printf("enable the motor\n");
         BLDCM_Enable();
@@ -36,6 +42,7 @@ void loop(void)
     }
 #if 1
     if (HAL_GetTick() % 1000 == 0 && flag == 0) {
+        GetADCValue();
         flag = 1;
         PrintMotorInformation();
     } else if (HAL_GetTick() % 1000 != 0 && flag == 1) {
@@ -49,6 +56,7 @@ void PrintMotorInformation()
     printf(
       "%f, %f V, %d mA, %d mA, %d mA\n", adc_value_.temp, adc_value_.v_bus, adc_value_.u_curr,
       adc_value_.v_curr, adc_value_.w_curr);
+    printf("motor shaft angle: %f\n", motor_drive.shaft_angle);
 }
 
 void BLDCM_Enable(void)
@@ -113,7 +121,7 @@ void UpdateMotorSpeed(uint8_t dir_in, uint32_t time)
         motor_drive.speed_group[count++] = 0;
     else {
         f = (1.0f / (84000000.0f / HALL_TIM_PSC + 1) * time);
-        f = (1.0f / 12.0f) / (f / 60.0f);
+        f = (1.0f / 24.0f) / (f / 60.0f);
         motor_drive.speed_group[count++] = f;
     }
     UpdateSpeedDir(dir_in);
@@ -136,12 +144,14 @@ void UpdateMotorSpeed(uint8_t dir_in, uint32_t time)
         }
         motor_drive.speed = speed_temp / count;
     }
+    UpdateMotorAngle(time);
 }
 
 void UpdateMotorAngle(uint32_t time)
 {
     float add_angle = motor_drive.speed * _PI_30 * (1.0f / (84000000.0f / HALL_TIM_PSC + 1) * time);
-    motor_drive.angle = motor_drive.angle;
+    motor_drive.shaft_angle = _normalizeAngle(
+      add_angle + motor_drive.electrical_angle / POLE_OF_PAIRS + _PI_2 * shaft_electrical_count);
 }
 
 void UpdateSpeedDir(uint8_t dir_in)
@@ -185,11 +195,15 @@ void UpdateSpeedDir(uint8_t dir_in)
 
 uint16_t GetBLDCMPulse(void) { return bldcm_pulse; }
 
-adc_value GetADCValue(void)
+adc_value * GetADCValue(void)
 {
-    float vdc_u = GET_ADC_VDC_VAL(adc_buffer[2]);
-    adc_value_.u_curr = GET_ADC_CURR_VAL(vdc_u);
-    return adc_value_;
+    static uint8_t flag = 0;
+    adc_value_.v_bus = GET_VBUS_VAL(GET_ADC_VDC_VAL(adc_buffer[1]));
+    adc_value_.u_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[2]));
+    adc_value_.v_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[3]));
+    adc_value_.w_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[4]));
+
+    return &adc_value_;
 }
 
 PhaseCurrent_s GetPhaseCurrents(void)
@@ -206,12 +220,11 @@ PhaseCurrent_s GetPhaseCurrents(void)
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef * hadc)
 {
     HAL_ADC_Stop_DMA(hadc);
-
     adc_value_.temp = adc_buffer[0];
-    adc_value_.v_bus = GET_VBUS_VAL(GET_ADC_VDC_VAL(adc_buffer[1]));
-    adc_value_.u_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[2]));
-    adc_value_.v_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[3]));
-    adc_value_.w_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[4]));
+    adc_value_.v_bus = adc_buffer[1];
+    adc_value_.u_curr = adc_buffer[2];
+    adc_value_.v_curr = adc_buffer[3];
+    adc_value_.w_curr = adc_buffer[4];
     HAL_ADC_Start_DMA(&hadc3, (uint32_t *)&adc_buffer, 5);
 }
 
@@ -220,25 +233,21 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef * hadc)
  */
 void HAL_TIM_TriggerCallback(TIM_HandleTypeDef * htim)
 {
-    uint8_t step = 0;
-    step = GetHallState();
-    if (motor_drive.angle < _PI_2) {
-    }
-    else if (motor_drive.angle < _PI) {
-    } else if (motor_drive.angle < _PI_2 * 3) {
-    } else {
-    }
-    
-    motor_drive.angle = (step - 1) * _PI_3;
-#if 0
-    printf("trigger IRQ.\n");
-	printf("hall: %d", step);
+    uint8_t hall_state = 0;
+    hall_state = GetHallState();
+    int8_t new_electric_sector = ELECTRIC_SECTORS[hall_state];
+
+#if PRINT_HALL_INFORMATION
+    printf("electrical angle: %f", motor_drive.electrical_angle);
+    printf("hall: %d\n", hall_state);
 #endif
+
     if (htim == &htim5) {
-        UpdateMotorSpeed(step, __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_1));
+        UpdateMotorSpeed(hall_state, __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_1));
+        motor_drive.electric_rotations += 1;
     }
-    uint16_t bldcm_pulse = 2000;
-    switch (step) {
+    uint16_t bldcm_pulse = 0;
+    switch (hall_state) {
         case 1: /* U+ W- */
             __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);
             HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);
@@ -246,82 +255,80 @@ void HAL_TIM_TriggerCallback(TIM_HandleTypeDef * htim)
             __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);
             HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, bldcm_pulse);
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, bldcm_pulse);
+            PWM1_DUTY(bldcm_pulse);
             HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _11PI_6;
+            shaft_electrical_count++;
+            shaft_electrical_count = _constrain(shaft_electrical_count, 0, 3);
             break;
 
-        case 2:                                               /* V+ U- */
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);  // 通道 3 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+        case 2: /* V+ U- */
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);  // 通道 1 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, bldcm_pulse);  // 通道 2
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_SET);  // 弿启下桥臂
-
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, bldcm_pulse);
+            PWM2_DUTY(bldcm_pulse);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _PI_2;
             break;
 
-        case 3:                                               /* V+ W- */
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);  // 通道 1 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+        case 3: /* V+ W- */
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);  // 通道 3 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, bldcm_pulse);  // 通道 2
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_SET);  // 弿启下桥臂
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, bldcm_pulse);
+            PWM2_DUTY(bldcm_pulse);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _PI_6;
             break;
 
-        case 4:                                               /* W+ V- */
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);  // 通道 1 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+        case 4: /* W+ V- */
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);  // 通道 2 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, bldcm_pulse);  // 通道 3
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_SET);  // 弿启下桥臂
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, bldcm_pulse);
+            PWM3_DUTY(bldcm_pulse);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _7PI_6;
             break;
 
-        case 5:                                               /* U+  V -*/
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);  // 通道 3 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+        case 5: /* U+  V-*/
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);  // 通道 2 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, bldcm_pulse);  // 通道 1
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_SET);  // 弿启下桥臂
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, bldcm_pulse);
+            PWM1_DUTY(bldcm_pulse);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _3PI_2;
             break;
 
-        case 6:                                               /* W+ U- */
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);  // 通道 2 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+        case 6: /* W+ U- */
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM2_GPIO_Port, MOTOR_OCNPWM2_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);  // 通道 1 配置丿 0
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);  // 关闭下桥臿
+            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM3_GPIO_Port, MOTOR_OCNPWM3_Pin, GPIO_PIN_RESET);
 
-            __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, bldcm_pulse);  // 通道 3
-            HAL_GPIO_WritePin(
-              MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_SET);  // 弿启下桥臂
+            // __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, bldcm_pulse);
+            PWM3_DUTY(bldcm_pulse);
+            HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_Port, MOTOR_OCNPWM1_Pin, GPIO_PIN_SET);
+            motor_drive.electrical_angle = _5PI_6;
             break;
     }
-    HAL_TIM_GenerateEvent(&htim8, TIM_EVENTSOURCE_COM);  // 软件产生换相事件，此时才将配置写兿
+    HAL_TIM_GenerateEvent(&htim8, TIM_EVENTSOURCE_COM);
 }
 
 /**

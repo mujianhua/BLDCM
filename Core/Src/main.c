@@ -100,13 +100,14 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-    printf("Hello World\n");  
+    printf("Hello World\n"); 
+    init(); 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
     while (1) {
-		loop();
+		  loop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
