@@ -15,11 +15,13 @@
 
 #include <stdio.h>
 
+uint32_t adc_buffer[5] = {0};
 static motor_rotate_t motor_drive = {0};
 
 adc_value adc_value_;
-
 uint16_t bldcm_pulse = 0;
+
+void init(void) { initFOC(); }
 
 void loop(void)
 {
@@ -110,7 +112,7 @@ void UpdateMotorSpeed(uint8_t dir_in, uint32_t time)
     if (time == 0)
         motor_drive.speed_group[count++] = 0;
     else {
-        f = (1.0f / (84000000.0f / 128) * time);
+        f = (1.0f / (84000000.0f / HALL_TIM_PSC + 1) * time);
         f = (1.0f / 12.0f) / (f / 60.0f);
         motor_drive.speed_group[count++] = f;
     }
@@ -134,6 +136,12 @@ void UpdateMotorSpeed(uint8_t dir_in, uint32_t time)
         }
         motor_drive.speed = speed_temp / count;
     }
+}
+
+void UpdateMotorAngle(uint32_t time)
+{
+    float add_angle = motor_drive.speed * _PI_30 * (1.0f / (84000000.0f / HALL_TIM_PSC + 1) * time);
+    motor_drive.angle = motor_drive.angle;
 }
 
 void UpdateSpeedDir(uint8_t dir_in)
@@ -214,6 +222,14 @@ void HAL_TIM_TriggerCallback(TIM_HandleTypeDef * htim)
 {
     uint8_t step = 0;
     step = GetHallState();
+    if (motor_drive.angle < _PI_2) {
+    }
+    else if (motor_drive.angle < _PI) {
+    } else if (motor_drive.angle < _PI_2 * 3) {
+    } else {
+    }
+    
+    motor_drive.angle = (step - 1) * _PI_3;
 #if 0
     printf("trigger IRQ.\n");
 	printf("hall: %d", step);

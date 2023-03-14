@@ -62,6 +62,8 @@ void Error_Handler(void);
 #define HALL_TIM_Counter 4999
 #define ADC_TIM_PSC 167
 #define ADC_TIM_Counter 4999
+#define PWM_TIM_PSC 1
+#define PWM_TIM_Counter 5659
 #define MOTOR_SD_Pin GPIO_PIN_6
 #define MOTOR_SD_GPIO_Port GPIOE
 #define KEY3_Pin GPIO_PIN_13
@@ -103,8 +105,6 @@ void Error_Handler(void);
 #define MOTOR_OCPWM3_Pin GPIO_PIN_7
 #define MOTOR_OCPWM3_GPIO_Port GPIOI
 /* USER CODE BEGIN Private defines */
-
-extern uint16_t adc_buffer[5];
 
 /* USER CODE END Private defines */
 

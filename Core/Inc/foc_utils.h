@@ -21,6 +21,7 @@
 #define _2PI                       6.28318530718
 #define _3PI_2                     4.71238898038
 #define _PI_6                      0.52359877559
+#define _PI_30                     0.104719755
 
 #define NOT_SET                    -12345.0
 #define _HIGH_IMPEDANCE            0
@@ -46,6 +47,12 @@ typedef struct
     float d;
     float q;
 } DQVoltage_s;
+
+typedef struct
+{
+    float alpha;
+    float beta;
+} AlphaBetaVoltage_s;
 
 /**
  *  Function approximating the sine calculation by using fixed size array

@@ -86,7 +86,7 @@ void MX_TIM5_Init(void)
   htim5.Init.Period = HALL_TIM_Counter;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_BOTHEDGE;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
   sConfig.IC1Filter = 10;
   sConfig.Commutation_Delay = 0;
@@ -112,7 +112,7 @@ void MX_TIM8_Init(void)
 
   htim8.Instance = TIM8;
   htim8.Init.Prescaler = 1;
-  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
   htim8.Init.Period = 5659;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;

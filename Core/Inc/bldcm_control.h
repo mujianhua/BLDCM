@@ -1,14 +1,11 @@
 #ifndef __BLDCM_CONTROL_H_
 #define __BLDCM_CONTROL_H_
 
-#ifdef __cplusplus
- extern "C" {
-#endif
-
+#include "foc_utils.h"
 #include "main.h"
 #include "stm32f4xx.h"  // Device header
 #include "tim.h"
-#include "foc_utils.h"
+
 
 #define BLDCM_ENABLE_SD()     HAL_GPIO_WritePin(MOTOR_SD_GPIO_Port, MOTOR_SD_Pin, GPIO_PIN_SET)
 #define BLDCM_DISABLE_SD()    HAL_GPIO_WritePin(MOTOR_SD_GPIO_Port, MOTOR_SD_Pin, GPIO_PIN_RESET)
@@ -28,6 +25,8 @@
 #define CLOSE_PWM1_LOWER \
     HAL_GPIO_WritePin(MOTOR_OCNPWM1_GPIO_PORT, MOTOR_OCNPWM1_PIN, GPIO_PIN_RESET)
 
+#define UDC 12
+
 typedef enum {
     MOTOR_FWD = 0,
     MOTOR_REV,
@@ -40,6 +39,7 @@ typedef struct
     float speed;
     uint16_t duty;
     int32_t speed_group[SPEED_FILTER_NUM];
+    float angle;
 } motor_rotate_t;
 
 typedef struct
@@ -51,8 +51,7 @@ typedef struct
     int32_t w_curr;
 } adc_value;
 
-
-void Init(void);
+void init(void);
 
 void loop(void);
 
@@ -66,6 +65,8 @@ uint8_t GetHallState(void);
 
 void UpdateMotorSpeed(uint8_t dir_in, uint32_t time);
 
+void UpdateMotorAngle(uint32_t time);
+
 void UpdateSpeedDir(uint8_t dir_in);
 
 uint16_t GetBLDCMPulse(void);
@@ -73,9 +74,5 @@ uint16_t GetBLDCMPulse(void);
 adc_value GetADCValue(void);
 
 PhaseCurrent_s GetPhaseCurrents(void);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

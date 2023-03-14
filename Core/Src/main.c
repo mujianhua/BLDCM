@@ -61,7 +61,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t adc_buffer[5] = {0};
+
 /* USER CODE END 0 */
 
 /**
