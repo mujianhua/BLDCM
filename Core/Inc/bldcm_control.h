@@ -7,6 +7,7 @@
 #include "tim.h"
 
 #define POLE_OF_PAIRS          4
+#define CPR                    24
 
 #define PRINT_HALL_INFORMATION 1
 #define PRINT_ADC_INFORMATION  0
@@ -44,15 +45,14 @@ typedef enum {
 } motor_dir_t;
 
 typedef enum {
-    CW = 1,      // clockwise
-    CCW = -1,    // counter clockwise
-    UNKNOWN = 0  // not yet known or invalid state
-} Direction;
+    CW = 1,       // clockwise
+    CCW = -1,     // counter clockwise
+    UNKNOWN = 0,  // not yet known or invalid state
+} Direction__;
 
 typedef struct
 {
     uint8_t enable_flag;
-    motor_dir_t direction;
     float speed;
     uint16_t duty;
     int32_t speed_group[SPEED_FILTER_NUM];

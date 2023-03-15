@@ -61,7 +61,7 @@ void Error_Handler(void);
 #define HALL_TIM_PSC 167
 #define HALL_TIM_Counter 4999
 #define ADC_TIM_PSC 167
-#define ADC_TIM_Counter 4999
+#define ADC_TIM_Counter 499
 #define PWM_TIM_PSC 1
 #define PWM_TIM_Counter 5659
 #define MOTOR_SD_Pin GPIO_PIN_6
@@ -76,8 +76,6 @@ void Error_Handler(void);
 #define CURR_W_ADC_GPIO_Port GPIOF
 #define VBUS_Pin GPIO_PIN_9
 #define VBUS_GPIO_Port GPIOF
-#define TEMP_ADC_Pin GPIO_PIN_10
-#define TEMP_ADC_GPIO_Port GPIOF
 #define KEY1_Pin GPIO_PIN_0
 #define KEY1_GPIO_Port GPIOA
 #define HALL_INPUT1_Pin GPIO_PIN_10

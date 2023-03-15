@@ -19,15 +19,30 @@
 const int8_t ELECTRIC_SECTORS[8] = {-1, 0, 4, 5, 2, 1, 3, -1};
 volatile int8_t electric_sector;
 
-int16_t adc_buffer[5] = {0};
+int16_t adc_buffer[4] = {0};
 static motor_rotate_t motor_drive = {0};
-Direction direction;
+Direction__ direction;
 
 adc_value adc_value_;
 uint16_t bldcm_pulse = 0;
 uint8_t shaft_electrical_count = 0;
 
-void init(void) { initFOC(); }
+void init(void)
+{
+    // ADC
+    HAL_ADCEx_InjectedStart(&hadc3);
+    __HAL_ADC_ENABLE_IT(&hadc3, ADC_IT_JEOC);
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);  // ADC TIM
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 2000);
+    uint8_t ii = 20;
+    while (ii--) {
+        GetADCValue();
+        HAL_Delay(1);
+    }
+    // Drive plate.
+    BLDCM_ENABLE_SD();  // driver plate MOTOR SD enable.
+    initFOC();
+}
 
 uint8_t flag = 0;
 void loop(void)
@@ -56,12 +71,11 @@ void PrintMotorInformation()
     printf(
       "%f, %f V, %d mA, %d mA, %d mA\n", adc_value_.temp, adc_value_.v_bus, adc_value_.u_curr,
       adc_value_.v_curr, adc_value_.w_curr);
-    printf("motor shaft angle: %f\n", motor_drive.shaft_angle);
+    //    printf("motor shaft angle: %f\n", motor_drive.shaft_angle);
 }
 
 void BLDCM_Enable(void)
 {
-    BLDCM_ENABLE_SD();  // driver plate MOTOR SD enable.
     // HALL
     __HAL_TIM_ENABLE_IT(&htim5, TIM_IT_TRIGGER);  // Enable HALL Trigger IRQ
     __HAL_TIM_ENABLE_IT(&htim5, TIM_IT_UPDATE);
@@ -74,9 +88,7 @@ void BLDCM_Enable(void)
     HAL_TIMEx_PWMN_Start(&htim8, TIM_CHANNEL_1);
     HAL_TIMEx_PWMN_Start(&htim8, TIM_CHANNEL_2);
     HAL_TIMEx_PWMN_Start(&htim8, TIM_CHANNEL_3);
-    // ADC
-    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);               // ADC TIM
-    HAL_ADC_Start_DMA(&hadc3, (uint32_t *)&adc_buffer, 5);  // Open ADC_DMA
+    // FLAG
     motor_drive.enable_flag = 1;
 }
 
@@ -124,7 +136,6 @@ void UpdateMotorSpeed(uint8_t dir_in, uint32_t time)
         f = (1.0f / 24.0f) / (f / 60.0f);
         motor_drive.speed_group[count++] = f;
     }
-    UpdateSpeedDir(dir_in);
     //	motor_drive.speed = motor_drive.speed_group[count-1];
     if (count >= SPEED_FILTER_NUM) {
         flag = 1;
@@ -154,54 +165,30 @@ void UpdateMotorAngle(uint32_t time)
       add_angle + motor_drive.electrical_angle / POLE_OF_PAIRS + _PI_2 * shaft_electrical_count);
 }
 
-void UpdateSpeedDir(uint8_t dir_in)
-{
-    uint8_t step[6] = {1, 3, 2, 6, 4, 5};
-
-    static uint8_t num_old = 0;
-    uint8_t step_loc = 0;  // 记录当前霍尔位置
-    int8_t dir = 1;
-    for (step_loc = 0; step_loc < 6; step_loc++) {
-        if (step[step_loc] == dir_in) {
-            break;
-        }
-    }
-    // 端点处理
-    if (step_loc == 0) {
-        if (num_old == 1) {
-            dir = 1;
-        } else if (num_old == 5) {
-            dir = -1;
-        }
-    } else if (step_loc == 5) {
-        if (num_old == 0) {
-            dir = 1;
-        } else if (num_old == 4) {
-            dir = -1;
-        }
-    } else if (step_loc > num_old) {
-        dir = -1;
-    } else if (step_loc < num_old) {
-        dir = 1;
-    }
-    if (dir == 1)
-        motor_drive.direction = MOTOR_FWD;
-    else
-        motor_drive.direction = MOTOR_REV;
-    num_old = step_loc;
-    //  motor_drive.speed *= dir;;
-    motor_drive.speed_group[count - 1] *= dir;
-}
-
 uint16_t GetBLDCMPulse(void) { return bldcm_pulse; }
 
 adc_value * GetADCValue(void)
 {
     static uint8_t flag = 0;
-    adc_value_.v_bus = GET_VBUS_VAL(GET_ADC_VDC_VAL(adc_buffer[1]));
-    adc_value_.u_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[2]));
-    adc_value_.v_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[3]));
-    adc_value_.w_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[4]));
+    static uint16_t adc_offest[4] = {0};
+    if (flag < 17) {
+        for (uint8_t i = 0; i < 4; i++) {
+            adc_offest[i] = adc_buffer[i];
+        }
+        flag++;
+    }
+    for (uint8_t i = 0; i < 4; i++) {
+        if (adc_buffer[i] > adc_offest[i]) {
+            adc_buffer[i] -= adc_offest[i];
+        } else {
+            adc_buffer[i] = 0;
+        }
+    }
+
+    adc_value_.u_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[0]));
+    adc_value_.v_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[1]));
+    adc_value_.w_curr = GET_ADC_CURR_VAL(GET_ADC_VDC_VAL(adc_buffer[2]));
+    adc_value_.v_bus = GET_VBUS_VAL(GET_ADC_VDC_VAL(adc_buffer[3]));
 
     return &adc_value_;
 }
@@ -212,20 +199,23 @@ PhaseCurrent_s GetPhaseCurrents(void)
     return phase_current;
 }
 
-/****************************************** IRQ Callback****************************************/
+/**************************************** IRQ Callback ****************************************/
 /**
  * @brief Get current signal from ADC_DMA.
  */
 // TODO: test ADC value.
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef * hadc)
+// void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef * hadc)
+// {
+//     HAL_ADC_Stop_DMA(hadc);
+//     HAL_ADC_Start_DMA(&hadc3, (uint32_t *)&adc_buffer, 5);
+// }
+
+void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef * hadc)
 {
-    HAL_ADC_Stop_DMA(hadc);
-    adc_value_.temp = adc_buffer[0];
-    adc_value_.v_bus = adc_buffer[1];
-    adc_value_.u_curr = adc_buffer[2];
-    adc_value_.v_curr = adc_buffer[3];
-    adc_value_.w_curr = adc_buffer[4];
-    HAL_ADC_Start_DMA(&hadc3, (uint32_t *)&adc_buffer, 5);
+    adc_buffer[0] = hadc->Instance->JDR1;
+    adc_buffer[1] = hadc->Instance->JDR2;
+    adc_buffer[2] = hadc->Instance->JDR3;
+    adc_buffer[3] = hadc->Instance->JDR4;
 }
 
 /**
@@ -236,15 +226,26 @@ void HAL_TIM_TriggerCallback(TIM_HandleTypeDef * htim)
     uint8_t hall_state = 0;
     hall_state = GetHallState();
     int8_t new_electric_sector = ELECTRIC_SECTORS[hall_state];
+    if (new_electric_sector - electric_sector > 3) {
+        direction = CCW;
+        motor_drive.electric_rotations += direction;
+    } else if (new_electric_sector - electric_sector < (-3)) {
+        direction = CW;
+        motor_drive.electric_rotations += direction;
+    } else {
+        direction = (new_electric_sector > electric_sector) ? CW : CCW;
+    }
+    electric_sector = new_electric_sector;
+    motor_drive.shaft_angle = _normalizeAngle(
+      (float)(motor_drive.electric_rotations * 6 + electric_sector) / (float)CPR * _2PI);
 
 #if PRINT_HALL_INFORMATION
-    printf("electrical angle: %f", motor_drive.electrical_angle);
-    printf("hall: %d\n", hall_state);
+    printf("shaft angle: %f\n", motor_drive.shaft_angle);
+    printf("hall: %d, sector: %d, Direction: %d\n", hall_state, electric_sector, direction);
 #endif
 
     if (htim == &htim5) {
-        UpdateMotorSpeed(hall_state, __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_1));
-        motor_drive.electric_rotations += 1;
+        // UpdateMotorSpeed(hall_state, __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_1));
     }
     uint16_t bldcm_pulse = 0;
     switch (hall_state) {
